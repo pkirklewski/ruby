@@ -1,0 +1,12 @@
+require 'whois'
+
+
+r = Whois.whois("dhdkhsdehfdgfdsf.com")
+
+if r.registered?
+  p "r is registered"
+end
+
+if r.available?
+  p "r is available"
+end

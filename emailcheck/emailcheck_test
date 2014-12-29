@@ -1,0 +1,150 @@
+require 'mysql'
+require 'email_verifier'
+require 'thread'
+require 'thwait'
+#########################################################################################
+      def mysqlread(q)
+
+        con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+        rs = con.query(q)
+        con.close
+
+        c = 0
+
+        a = Array.new
+
+        rs.each_hash{ |h|
+
+          c += 1
+
+         a.insert(c,"#{h['id']},#{h['www']}")
+        }
+
+      return a
+
+      end
+#########################################################################################
+          def emailcheck(i,w)
+
+          id = i
+          www = w
+
+          done = Array.new
+
+          if !done.include?(www)
+
+          end
+
+          emails = ""
+
+            a  = ['sfdsfuh','info','contact','contactus','pastor','office','youth','board','prayer','pray']
+
+            (0..a.length-1).each { |i|
+
+              email = "#{a[i]}@#{www}"
+begin
+
+                if EmailVerifier.check(email)
+
+                    if email.include?("sfdsfuh") # if their e-mail server responds to this crap then it means it's a catchall email
+                      emails = "info@#{www}"
+                      q = "UPDATE churches.us SET email_generated='#{emails}' where id=#{id}"
+                      mysqlwrite(q)
+                      break
+                    else
+                          if emails.length < 1 # If first email then no delimiter needed
+                            emails = "#{email}"
+                          else
+                            emails = emails + ";" + email # If not a fist email then delimiter needed
+                          end
+                    end
+
+                end
+rescue
+    next
+end
+            }
+                if emails.include?("@") and emails.length >= 3 # Checking if emails contains any email addresses
+                  q = "UPDATE churches.us SET email_generated='#{emails}' where id=#{id}"
+                  mysqlwrite(q)
+                end
+
+          end
+
+#########################################################################################
+              def mysqlwrite(i)
+
+                p "From msqlwrite: #{i}"
+
+                con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+                con.query(i)
+                con.close
+
+              end
+#########################################################################################
+
+class EmailGenerator
+
+  thread_limit = 10
+  query="SELECT id,www FROM churches.us WHERE www NOT like 'NULL'"
+  threads = []
+  done = Array.new
+
+  r = mysqlread(query)
+
+      (1..r.length-1).each{|k|
+
+        t = r[k].to_s
+
+        if !t.include?(",") or t.length < 3 # remove crap
+          p "BAD t: #{t} k: #{k}"
+          next
+        end
+
+        id = t[0,t.index(',')]
+        www = t[t.index(',')+1,t.length-t.index(',')]
+        www = www.gsub('http://','')
+        www = www.gsub('www.','')
+
+        until threads.map {|thr| thr.status}.count("run") < thread_limit do # sleep as long as x < thread limit returns "false"
+          sleep 5
+          puts "sleeping 5 sec..."
+        end
+
+          threads << Thread.new {
+            #puts "thread#{k}"
+
+              if !done.include?(www)
+                  emailcheck(id,www)
+                  done.insert(done.length,www)
+              else
+                p "done already includes #{www}"
+              end
+
+          }
+
+        #ThreadsWait.all_waits(*threads)
+
+      }
+
+ (0..done.length-1).each {|z|
+    puts done[z]
+  }
+
+# making sure all threads are able to finish their work
+
+  (0..100000).each {|sleeping|
+
+    if threads.map {|thr| thr.status}.count("run") > 0 or threads.map {|thr| thr.status}.count("sleep") > 0
+
+      sleep 5
+
+        sleeping_threads = threads.map {|thr| thr.status}.count("sleep")
+        running_threads = threads.map {|thr| thr.status}.count("run")
+
+      puts "Will sleep 5 sec - sleeping threads: #{sleeping_threads} running threads: #{running_threads}"
+
+    end
+  }
+
+end

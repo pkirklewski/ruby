@@ -1,0 +1,55 @@
+require 'open-uri'
+require 'nokogiri'
+require 'csv'
+require 'mysql'
+require 'internet_connection'
+
+#city = "Berkeley"
+#state = "CA"
+
+def getByCity(city,state,n,howmanyt)
+  if n == 701
+    begin
+      # waitIfNoInternet(1000000)
+      puts "before source"
+
+      source = open("http://yellowpages.aol.com/search?query=Church&area=#{city}%2C+#{state}&invocationType=localTopBox.search").read
+
+      puts source
+    rescue Exeption => ex
+      puts "An error of type #{ex.class} happened arround line 29, message is #{ex.message}"
+    end
+    # End of: Grab source from www ===========================================================<
+  end
+  puts 'all done'
+end
+
+class ScrapeChurches
+
+  #waitIfNoInternet(1000000)
+
+# Load Cities from CSV ############################################################
+  cities = CSV.read('/root/fetching-sites/uscitiesDone.csv')
+  thread_limit = 40
+  threads = []
+
+  (0..cities.length-1).each { |n|
+
+    #puts "========================================="
+    #puts "Beginning #{cities[n][0]}, #{cities[n][1]}"
+
+    city = cities[n][0]
+    city = city.gsub(' ','%2C')
+    state = cities[n][1]
+
+      until threads.map {|t| t.status}.count("run") < thread_limit do
+        sleep 5
+      end
+      howmanyt = threads.map{|th| th.status}.count("run")
+      threads << Thread.new {getByCity(city,state,n,howmanyt)}
+
+    # End of Load Cities from CSV ############################################################
+
+  } # cities
+
+end

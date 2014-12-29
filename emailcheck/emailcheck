@@ -1,0 +1,75 @@
+require 'mysql'
+require 'email_verifier'
+
+def mysql_readwrite(q)
+    con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+    query="SELECT id,www FROM churches.us WHERE www NOT like 'NULL'"
+    rs = con.query(q)
+    array_of_results = Array.new
+    con.close
+end
+
+b = Array.new
+
+rs.each_hash {|h|
+
+  #puts "loop:#{h}"
+
+id = h['id']
+www = h['www']
+  www = www.sub('http://','')
+  www = www.sub('www.','')
+
+  a = ['sfdsfuh','info','contact','contactus','pastor','office','youth','board','prayer','pray']
+
+if !b.include?(www)
+
+  emails = ""
+
+ (0..a.length-1).each { |i|
+   email = "#{a[i]}@#{www}"
+
+      begin
+
+          if EmailVerifier.check(email)
+
+                 if email.include?("sfdsfuh")
+                   email = "info@#{www}"
+                   b[b.length] = www
+
+                   emails = email
+
+                   break
+                 else
+
+                      if !b.include?(www)
+                        b[b.length] = www
+                      end
+
+                      if emails.length < 1 # If first email then no delimiter needed
+                        emails = "#{email}"
+                      else
+                        emails = emails + ";" + email # If not a fist email then delimiter needed
+                      end
+
+                 end
+          end
+
+      rescue
+
+      end
+
+}
+  if !emails.empty?
+    puts "#{emails}"
+    qinsert = "UPDATE churches.us  SET email_generated='#{emails}' where id=#{id}"
+    puts qinsert
+    con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+    rs = con.query(qinsert)
+    con.close
+  end
+
+else
+  #puts "b already includes #{www}"
+end
+}

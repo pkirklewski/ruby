@@ -1,0 +1,208 @@
+require 'mysql'
+require 'open-uri'
+require 'words_counted'
+
+def countwords(source,word)
+  number_of_words = 0
+
+  (0..100).each{|i|
+
+    if source.index(word)
+      number_of_words += 1
+      source = source[source.index(word)+word.length,source.length]
+    else
+      return number_of_words
+    end
+
+  }
+
+
+  p "number of words: #{number_of_words}"
+  return number_of_words
+end
+
+def get_email_from_www(id,www)
+
+  extensions = ['','/about-us/contact-us/','/contact.html','/contact.php','/contactus.html','/contact.shtml','/contact.htm','/contact','/#/contact-us','/#/contact','/#/contact/staff','/contact-3','/#/contact','/about/contact.cfm','/about-us/','/aboutus/','/staff','/info/staff','/missions','/welcome/our-staff','/index.php/contact-us','/about-us/staff','/new-to-pbc/our-staff']
+  done = Array.new
+  emails = ""
+  source = ""
+
+ (0..extensions.length-1).each{|e|
+
+   contactwww = "#{www}#{extensions[e]}"
+    begin
+
+      timeout(10) do
+       source = open(contactwww).read.to_s
+        #p source
+
+      end
+
+    rescue Exeption => ex
+      puts "An error of type #{ex.class} happened arround line 25, message is #{ex.message}"
+      next
+    end
+
+   howmanyemails = countwords(source,"mailto:")
+
+
+   if howmanyemails == 0
+     next
+   end
+
+(1..howmanyemails).each{|m|
+
+     begin
+       if source.include?('Terms of use') or source.include?('the site or service will not give, sell, or otherwise transfer addresses maintained')
+       p "!!! TERMS OF USE  present !!!!!!!!!!!!! #{id} #{www}"
+       end
+     if source.include?('the site or service will not give, sell, or otherwise transfer addresses maintained')
+       p "!!! CAN-SPAM  present !!!!!!!!!!!!! #{id} #{www}"
+     end
+
+   rescue
+     next
+   end
+
+   if source.include?('mailto:')
+
+      a = source[source.index('mailto:').to_i, 100]
+      if a == nil
+        next
+      else
+                if a.include?('@')
+                 username = a[7,a.index('@')-7]
+                   if username == nil
+                     next
+                   else
+                     if username.include?('.')
+                       domain = a[a.index('@'),100]
+                       domain = domain[0,domain.index('.')+4]
+                       b = "#{username}#{domain}"
+                     else
+                       b = a[7,a.index('.').to_i-3]
+                     end
+                  end
+
+                end
+
+                if a.include?('%40')
+                    a = a.gsub('%40','@')
+                    username = a[7,a.index('@')-7]
+                    if username == nil
+                      next
+                    else
+                      if username.include?('.')
+                        domain = a[a.index('@'),100]
+                        domain = domain[0,domain.index('.')+4]
+                        b = "#{username}#{domain}"
+                      else
+                        b = a[7,a.index('.').to_i-3]
+                      end
+                    end
+
+                end
+
+      end
+
+      if b != nil
+
+        if b.include?('?')
+          b = b[0,b.index('">').to_i-7]
+            if b == nil
+              next
+            end
+        end
+begin
+        if b.include?('target') or b.include?('class')
+          b = b[0,b.index('"').to_i]
+            if b == nil
+              next
+            end
+        end
+
+rescue
+  p "error ???"
+end
+        b = b.gsub('%40','@')
+
+                if done.include?(b) or b.include?('webadmin') or b.include?('admin')
+
+                else
+                  done.insert(e,b)
+
+                  if emails.length > 0
+                    emails = "#{emails};#{b}"
+                  else
+                    emails = b
+                  end
+
+                  #puts "done length: #{done.length}"
+                end
+      end
+
+   else
+    #puts "!!! #{www} - no email found"
+   end
+if howmanyemails > 1
+  start =   source.index("mailto:").to_i+7
+  len = source.length - start
+
+  source = source[start,len]
+
+end
+
+} # how many emails
+ } # extensions
+
+   if emails.include?("@") and emails.length >= 6 # Checking if emails contains any email addresses
+     puts "id: #{id} len:#{emails.length} emails:#{emails}"
+     q = "UPDATE organisations.churchus SET email_www='#{emails}' where id=#{id}"
+     p q
+     con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','organisations')
+     rs = con.query(q)
+     con.close
+   end
+
+end
+
+class EmailFromWWW
+
+  query = "SELECT id,www FROM organisations.churchus where www not like 'NULL' and email_generated  like '%@%' and ismegachurch='YES'" #http://www.christcentralchurch.org
+  #query = "SELECT id,www FROM organisations.churchus where www like '%christcentralchurch%'"
+  con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','organisations')
+  rs = con.query(query)
+  con.close
+
+  thread_limit = 10
+  threads = []
+
+  rs.each_hash{|h|
+
+    id = h['id']
+    www = h['www']
+
+    until threads.map {|thr| thr.status}.count("run") < thread_limit do # sleep as long as x < thread limit returns "false"
+
+      sleeping_threads = threads.map {|thr| thr.status}.count("sleep")
+      running_threads = threads.map {|thr| thr.status}.count("run")
+      puts "Thread limit exceeded: Will sleep 5 sec - sleeping threads: #{sleeping_threads} running threads: #{running_threads}"
+      sleep 5
+    end
+
+    threads << Thread.new { get_email_from_www(id,www) }
+
+  }
+
+  (0..100000).each {|sleeping|
+
+    if threads.map {|thr| thr.status}.count("run") > 0 or threads.map {|thr| thr.status}.count("sleep") > 0
+      sleeping_threads = threads.map {|thr| thr.status}.count("sleep")
+      running_threads = threads.map {|thr| thr.status}.count("run")
+      puts "Some threads are still running: Will sleep 5 sec - sleeping threads: #{sleeping_threads} running threads: #{running_threads}"
+      sleep 5
+    end
+  }
+
+    end

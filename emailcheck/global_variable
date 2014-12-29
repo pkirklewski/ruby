@@ -1,0 +1,48 @@
+require 'mysql'
+require 'thread'
+require 'thwait'
+
+def msqlwrite(q)
+
+  sleep 60
+  con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+  rs = con.query(q)
+  con.close
+
+end
+
+class TestThreads
+msqlwrite("select count(*) from organisations.churchus")
+threads = []
+
+(0..10).each {|i|
+  id = "ID_#{i}"
+
+  qinsert = "insert into churches.tst  values('#{id}')"
+
+  puts qinsert
+
+      threads <<  Thread.new{msqlwrite(qinsert)}
+
+sleep 1
+  }
+
+sleeping_threads = threads.map {|thr| thr.status}.count("sleep")
+running_threads = threads.map {|thr| thr.status}.count("run")
+puts "Before until sleeping threads: #{sleeping_threads} running threads: #{running_threads}"
+
+(0..100000).each {|sleeping|
+
+  if threads.map {|thr| thr.status}.count("run") > 0 or threads.map {|thr| thr.status}.count("sleep") > 0
+
+    sleep 5
+
+    sleeping_threads = threads.map {|thr| thr.status}.count("sleep")
+    running_threads = threads.map {|thr| thr.status}.count("run")
+
+    puts "Will sleep 5 sec - sleeping threads: #{sleeping_threads} running threads: #{running_threads}"
+
+  end
+}
+
+end

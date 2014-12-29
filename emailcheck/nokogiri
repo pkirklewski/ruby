@@ -1,0 +1,21 @@
+require 'nokogiri'
+require 'open-uri'
+
+doc = Nokogiri::HTML.parse(open("http://hirr.hartsem.edu/megachurch/canadian-megachurches.html")) do |config|
+  config.noblanks
+end
+
+table = doc.xpath('//table/tr[count(td)=7]') #table = data_table.xpath('//table[@class="main"]') # if table has a class
+
+rows = table.css('tr').map do |row|
+p row.xpath('./td').map(&:text)[0,7].join(',')
+
+  org_name = row.xpath('./td').map(&:text)[0]
+  org_locality = row.xpath('./td').map(&:text)[3]
+  www = row.xpath('./td').map(&:text)[5]
+#p "#{org_name} , #{org_locality}, #{www}"
+  p row.xpath('./td').map(&:text)[0,7].join(',')
+end
+
+
+

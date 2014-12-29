@@ -1,0 +1,134 @@
+require 'mysql'
+require 'mail'
+require 'email_verifier'
+
+def disassemble(t)
+
+end
+
+def mysqlwrite(q)
+ con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','organisations')
+ rs = con.query(q)
+ con.close
+end
+
+def mysqlread(q)
+
+  begin
+    con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','organisations')
+    rs = con.query(q)
+    con.close
+    return rs
+  rescue
+    return false
+  end
+
+end
+
+def valid_email( value )
+  begin
+    return false if value == ''
+    parsed = Mail::Address.new( value )
+    begin
+      if EmailVerifier.check(value)
+        return parsed.address == value && parsed.local != parsed.address
+      end
+    rescue
+      return false
+    end
+  rescue Mail::Field::ParseError
+
+  end
+end
+
+def mysqlwrite(i)
+
+    begin
+      con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','organisations')
+      con.query(i)
+      con.close
+    rescue
+      return false
+    end
+
+end
+
+class PopulateEmailTable
+
+recordset = mysqlread("select id,email_www,email_generated from organisations.churchus where email_www  LIKE '%@%' or email_generated LIKE '%@%'")
+x = Array.new
+done = Array.new
+threads = []
+
+recordset.each_hash{ |h|
+
+  thread_limit = 50
+
+ id = h['id']
+  email_www = h['email_www'].to_s
+  email_generated = h['email_generated'].to_s
+
+ if email_www.length > 0 and email_generated.length > 0
+   emails = "#{email_www};#{email_generated}"
+ end
+
+ if email_www.length == 0 and email_generated.length > 0
+   emails = "#{email_generated}"
+ end
+
+ if email_www.length > 0 and email_generated.length == 0
+   emails = "#{email_www}"
+ end
+#p emails
+x = emails.split(';')
+
+ (0..x.length-1).each{|e|
+
+email = x[e]
+
+email = email.gsub('%20','')
+email = email.gsub('"','')
+email = email.gsub("//",'')
+
+if !email.include?('@') or email.include?('mormon') or email.include?('webmaster')
+   next
+end
+
+until threads.map {|thr| thr.status}.count("run") < thread_limit do # sleep as long as x < thread limit returns "false"
+  running_threads = threads.map {|thr| thr.status}.count("run")
+  sleep 5
+  puts "To many threads:#{running_threads} - sleeping 5 sec..."
+end
+
+if !done.include?(email)
+  threads << Thread.new {
+    if valid_email(email)
+
+      insert = "insert into  organisations.churchus_emails values('','#{id}','#{email}',NOW(),'','','')"
+      mysqlwrite(insert)
+      p email
+      done.insert(done.length,email)
+    end
+  } #threads
+else
+  next
+end
+
+}
+
+}
+
+
+(0..100000).each {|sleeping|
+
+  if threads.map {|thr| thr.status}.count("run") > 0 or threads.map {|thr| thr.status}.count("sleep") > 0
+
+      sleeping_threads = threads.map {|thr| thr.status}.count("sleep")
+      running_threads = threads.map {|thr| thr.status}.count("run")
+      puts "Will sleep 5 sec - sleeping threads: #{sleeping_threads} running threads: #{running_threads}"
+      sleep 5
+
+  end
+}
+p "done.length: #{done.length}"
+end

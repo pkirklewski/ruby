@@ -1,0 +1,144 @@
+require 'open-uri'
+require 'mysql'
+require 'nokogiri'
+
+
+#########################################################################################
+def add_array(a,b,domain)
+
+  c = Array.new
+
+
+          (0..a.length-1).each {|h|
+
+            if !c.include?(a[h]) and a[h].include?(domain) and !a[h].include?('javascript')
+              c.insert(c.length,a[h])
+            end
+
+          }
+
+
+      (0..b.length-1).each {|h|
+
+        if !c.include?(b[h]) and b[h].include?(domain) and !b[h].include?('javascript')
+          c.insert(c.length,b[h])
+        end
+
+      }
+
+      return c
+
+end
+#########################################################################################
+def gatherlinks(source,domain)
+  allinks = Array.new
+  doc = Nokogiri::HTML.parse(source) do |config|
+    config.noblanks
+  end
+
+  links = doc.css('a').map { |link| link['href'] }
+
+  # clean the links. Remove anchors and repeating links as well as javascript crap
+
+  (0..links.length-1).each{|h|
+
+    if !allinks.include?(links[h]) and links[h].include?(domain) and !links[h].include?('javascript')
+
+      allinks.insert(allinks.length,links[h])
+    end
+
+    if links[h].include?('javascript')
+      # clean javascript
+      cleaned_link = links[h]
+      cleaned_link =  cleaned_link[cleaned_link.index('http://'),cleaned_link.length - cleaned_link.index('http')]
+      cleaned_link = cleaned_link[0,cleaned_link.index("'")]
+
+      allinks.insert(allinks.length,cleaned_link)
+      # end of lean javascript
+    end
+  }
+  return allinks
+end
+
+#########################################################################################
+
+def sitemap(source)
+
+
+  if source.index('sitemap')
+    b = 'sitemap'
+    return b
+  end
+
+  if source.index('site-map')
+    b = 'site-map'
+    return b
+  end
+
+  return false
+end
+
+def cleandomain(www)
+  domain = www.gsub('http://','')
+  domain = domain.gsub('www.','')
+  domain = domain.gsub('/','')
+  domain = domain.gsub(':','')
+  domain = domain.gsub('#','')
+  return domain
+end
+
+
+#########################################################################################
+def mysqlread(q)
+
+  con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','organisations')
+  rs = con.query(q)
+  con.close
+
+  return rs
+
+end
+#########################################################################################
+
+class RobotWWW
+
+  q = "SELECT id,www FROM organisations.churchus where www not like 'NULL' and email_generated  like '%@%' and ismegachurch='YES'"
+
+  rs = mysqlread(q)
+
+  allinks = Array.new
+
+  rs.each_hash{|h|
+
+    id = h['id']
+    www = h['www']
+
+
+        begin # can we do something about the FORBIDDEN redirections ?
+            source = open(www).read
+        rescue
+          next
+        end
+
+    # clean the links. Remove anchors and repeating links as well as javascript crap
+
+    links_main_www = gatherlinks(source,domain)
+
+   sitemap_true =  sitemap(source)
+
+    if sitemap_true
+      sitemap_link = "http://www.#{domain}/#{sitemap_true}"
+
+      begin
+      source = open(sitemap_link).read
+      links_sitemap_www = gatherlinks(source,domain)
+      rescue
+      end
+
+      x = add_array(links_main_www,links_sitemap_www,domain)
+
+    end
+
+  }
+
+end

@@ -1,0 +1,70 @@
+require 'geocoder'
+require 'mysql'
+
+q = "select id,church_name,church_address,church_locality,church_state,church_tel,church_lon,church_lat from churches.us where church_lat='0' or church_lon='0' or church_zip='NULL' limit 2500"
+
+con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+rs = con.query(q)
+con.close
+rs.each_hash{ |h|
+
+ name = h['church_name']
+ addr = h['church_address']
+ locality = h['church_locality']
+ state = h['church_state']
+ id = h['id']
+
+ test = "#{id} #{addr},#{locality},#{state}"
+
+string = "#{addr},#{locality},#{state}"
+
+ Geocoder.configure(:timeout => 30)
+ x = Geocoder.search(string)
+ ll = x[0].data["geometry"]["location"]
+ lat = ll['lat']
+ lon = ll['lng']
+
+#p x[0].data["geometry"]
+#p x[0].data["geometry"]["location"]
+
+ p " #{id} #{name} | #{addr} | lng: #{x[0].geometry["viewport"]["southwest"]["lng"]} lat: #{x[0].geometry["viewport"]["southwest"]["lat"]} postal_code:#{x[0].postal_code}"
+ update = "UPDATE churches.us SET church_lon='#{lon}',church_lat='#{lat}',church_zip='#{x[0].postal_code}' where id='#{id}'"
+
+ puts update
+
+ con = Mysql.new('192.168.1.111','root','zaq1@WSX<>?','churches')
+ rs = con.query(update)
+ con.close
+
+}
+
+
+=begin
+
+ll = x[0].data["geometry"]["location"]
+address = x[0].data["formatted_address"]
+lat = ll['lat']
+lon = ll['lng']
+p "formatted_address: #{address}"
+p "lat: #{lat}"
+p "lon: #{lon}"
+
+puts x[0].city
+puts x[0].coordinates
+puts x[0].country
+puts x[0].country_code
+puts x[0].formatted_address
+puts x[0].geometry
+puts x[0].geometry["location"]
+puts x[0].geometry["viewport"]
+puts x[0].geometry["viewport"]["northeast"]
+puts x[0].geometry["viewport"]["southwest"]
+puts x[0].geometry["viewport"]["southwest"]["lat"]
+puts x[0].geometry["viewport"]["southwest"]["lng"]
+
+puts x[0].postal_code
+puts x[0].types
+=end
+
+
+

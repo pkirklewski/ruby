@@ -1,0 +1,38 @@
+require 'open-uri'
+require 'nokogiri'
+require 'csv'
+require 'mysql'
+require 'internet_connection'
+
+entry = '<?xml version .....1.1.1.1.1.1.</a></span><span1.1.1.2.2.3.3.4..<strong>SORRY we couldn\'t find any results for Church or similar terms. Maybe we can help...</strong></body>'
+
+
+if entry[0,5]=="<?xml" # Testing for what happens if the church name is ridicuous
+
+  if entry.include?("SORRY we") and entry.include?("find any results")
+    puts "SORRY we could not find any results"
+
+  else
+
+      posa =  entry.index('class="fn"').to_i+11
+      posb = entry.length - posa
+      entry = entry[posa,posb]
+      puts entry
+
+    end
+
+end
+
+
+
+if 1==1
+  suba = 0
+  subb = entry.index('</a>').to_i
+  church_name = entry[suba, subb]
+  puts "church_name: #{church_name}"
+  end
+
+
+
+
+
